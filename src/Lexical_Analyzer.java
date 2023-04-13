@@ -3,7 +3,7 @@ import java.util.*;
 public class Lexical_Analyzer {
     private Map<String, Token> keywordsAndOperatorsMap;
 
-    public Lexical_Analyzer() {
+    public Lexical_Analyzer() {  // define the keywords and operators
         this.keywordsAndOperatorsMap = new HashMap<>();
         keywordsAndOperatorsMap.put("(", Token.LEFTPAR);
         keywordsAndOperatorsMap.put(")", Token.RIGHTPAR);
@@ -21,13 +21,13 @@ public class Lexical_Analyzer {
     public List<Lexeme> analyzeCode(Map<Integer,String> lines) {
         List<Lexeme> lexemes = new ArrayList<>();
         try {
-            for (Map.Entry<Integer, String> entry : lines.entrySet()) {
+            for (Map.Entry<Integer, String> entry : lines.entrySet()) { // analyze line by line and get the lexemes
                 int nLine = entry.getKey();
                 String line = entry.getValue();
                 Map<Integer, Lexeme> lexLine = analyzeLine(nLine, line.strip());
                 lexemes.addAll(lexLine.values());
             }
-        } catch (LexicalException e) {
+        } catch (LexicalException e) { // if invalid token found, throw exception
             System.err.println(e.getMessage());
             System.exit(1);
         }
@@ -42,11 +42,11 @@ public class Lexical_Analyzer {
         int invalidTokenColumnNumber = columnNumber;
 
         boolean invalidTokenFlag = false;
-        for (char c : line.toCharArray()) {
-            Token token = automaton.evaluate(c);
+        for (char c : line.toCharArray()) { // read line char by char
+            Token token = automaton.evaluate(c); // match the character with token
             if (token == Token.NONE) {
                 currentLexeme.append(c);
-            } else {
+            } else { // process tokens and create current lexeme
                 if (currentLexeme.length() > 0) {
                     String lexemeString = currentLexeme.toString().strip();
                     if (!lexemeString.isEmpty()) {
@@ -63,7 +63,6 @@ public class Lexical_Analyzer {
                     currentLexeme.setLength(0);
                 }
                 if (token != Token.IDENTIFIER && token != Token.NUMBER) {
-
                     if (token == Token.INVALID) {
                         invalidTokenFlag = true;
                         invalidLexeme.append(c);
@@ -86,7 +85,7 @@ public class Lexical_Analyzer {
             columnNumber++;
         }
 
-        if (invalidTokenFlag) {
+        if (invalidTokenFlag) { // if inavlid token found, stop processing and throw an exception
             throw new LexicalException(String.format("LEXICAL ERROR [%d:%d]: Invalid token `%s'", lineNumber, invalidTokenColumnNumber, invalidLexeme));        }
 
         if (currentLexeme.length() > 0) {
@@ -98,12 +97,11 @@ public class Lexical_Analyzer {
                 } else if (Character.isDigit(lexemeString.charAt(0))) {
                     lastToken = Token.NUMBER;
                 }
-                if (lastToken != Token.NONE) {
+                if (lastToken != Token.NONE) { // create lexeme for the output
                     lineTokens.put(columnNumber - lexemeString.length(), new Lexeme(lastToken, lexemeString, lineNumber, columnNumber - lexemeString.length()));
                 }
             }
         }
-
         return lineTokens;
     }
 }

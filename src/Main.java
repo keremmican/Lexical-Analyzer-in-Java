@@ -8,10 +8,10 @@ import java.util.Map;
 public class Main {
     public static void main(String[] args) {
 
-        String filePath = "src/input.txt";
+        String filePath = "src/input.txt";  // get the file path
         Map<Integer, String> input = new HashMap<>();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {  // read the file
             String line;
             int lineNumber = 1;
 
@@ -24,11 +24,10 @@ public class Main {
             return;
         }
 
-        Lexical_Analyzer analyzer = new Lexical_Analyzer();
-        List<Lexeme> lexemes = analyzer.analyzeCode(input);
+        Lexical_Analyzer analyzer = new Lexical_Analyzer(); // create analyzer object
+        List<Lexeme> lexemes = analyzer.analyzeCode(input); // start analyzing the input
 
-        // Print the lexemes
-        for (Lexeme lexeme : lexemes) {
+        for (Lexeme lexeme : lexemes) { // Print the lexemes
             System.out.printf("%s %d:%d\n", lexeme.getToken().name(), lexeme.getLineNumber(), lexeme.getColumnNumber());
         }
     }

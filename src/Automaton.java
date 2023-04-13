@@ -1,7 +1,7 @@
 public class Automaton {
     private State state;
 
-    private enum State {
+    private enum State {  // define automaton states
         START,
         IDENTIFIER,
         NUMBER,
@@ -77,9 +77,6 @@ public class Automaton {
             default:
                 break;
         }
-
         return result;
     }
-
-
 }
