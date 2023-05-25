@@ -24,6 +24,7 @@ public class Main {
             try {
                 parser.parse();
                 System.out.println("Parsing completed successfully.");
+                System.out.println(parser.getAST()); // Print the AST
             } catch (Parser.ParserException e) {
                 System.err.println("Parsing Error: " + e.getMessage());
             }

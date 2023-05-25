@@ -4,6 +4,7 @@ public class Parser {
 
     private List<Lexeme> lexemes;
     private int currentIndex;
+    private Node ast;
 
     public Parser(List<Lexeme> lexemes) {
         this.lexemes = lexemes;
@@ -29,194 +30,253 @@ public class Parser {
     }
 
     public void parse() throws ParserException {
-        program();
+        ast = program();
+        if (getCurrentLexeme() != null) {
+            throw new ParserException("Syntax Error: unexpected token " + getCurrentLexeme().getToken().name());
+        }
     }
 
-    private void program() throws ParserException {
+    public Node getAST() {
+        return ast;
+    }
+
+    private Node program() throws ParserException {
+        Node programNode = new Node("Program");
+
         while (getCurrentLexeme() != null) {
-            topLevelForm();
+            programNode.addChild(topLevelForm());
         }
+
+        return programNode;
     }
 
-    private void topLevelForm() throws ParserException {
+    private Node topLevelForm() throws ParserException {
         match(Token.LEFTPAR);
-        secondLevelForm();
+        Node topLevelFormNode = new Node("TopLevelForm");
+        topLevelFormNode.addChild(secondLevelForm());
         match(Token.RIGHTPAR);
+        return topLevelFormNode;
     }
 
-    private void secondLevelForm() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.DEFINE) {
-            definition();
-        } else if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
-            funCall();
+    private Node secondLevelForm() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.DEFINE) {
+            return definition();
+        } else if (current != null && current.getToken() == Token.LEFTPAR) {
+            return funCall();
         } else {
-            throw new ParserException("Syntax Error: expected DEFINE or ( but found " + getCurrentLexeme().getToken().name());
+            throw new ParserException("Syntax Error: expected DEFINE or ( but found " + (current != null ? current.getToken().name() : "EOF"));
         }
     }
 
-    private void definition() throws ParserException {
+    private Node definition() throws ParserException {
         match(Token.DEFINE);
-        definitionRight();
+        return definitionRight();
     }
 
-    private void definitionRight() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.IDENTIFIER) {
+    private Node definitionRight() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.IDENTIFIER) {
+            Node identifierNode = new Node("Identifier", current.getValue());
             getNextLexeme();
-            expression();
-        } else if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
+            Node expressionNode = expression();
+            Node definitionRightNode = new Node("DefinitionRight");
+            definitionRightNode.addChild(identifierNode);
+            definitionRightNode.addChild(expressionNode);
+            return definitionRightNode;
+        } else if (current != null && current.getToken() == Token.LEFTPAR) {
             match(Token.LEFTPAR);
             match(Token.IDENTIFIER);
-            argList();
+            Node argListNode = argList();
             match(Token.RIGHTPAR);
-            statements();
+            Node statementsNode = statements();
+            Node definitionRightNode = new Node("DefinitionRight");
+            definitionRightNode.addChild(argListNode);
+            definitionRightNode.addChild(statementsNode);
+            return definitionRightNode;
         } else {
-            throw new ParserException("Syntax Error: expected IDENTIFIER or ( but found " + getCurrentLexeme().getToken().name());
+            throw new ParserException("Syntax Error: expected IDENTIFIER or ( but found " + (current != null ? current.getToken().name() : "EOF"));
         }
     }
 
-    private void argList() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.IDENTIFIER) {
+    private Node argList() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.IDENTIFIER) {
+            Node identifierNode = new Node("Identifier", current.getValue());
             getNextLexeme();
-            argList();
-        } else if (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            throw new ParserException("Syntax Error: expected IDENTIFIER or ) but found " + getCurrentLexeme().getToken().name());
+            Node argListNode = argList();
+            argListNode.addChild(identifierNode);
+            return argListNode;
+        } else if (current != null && current.getToken() != Token.RIGHTPAR) {
+            throw new ParserException("Syntax Error: expected IDENTIFIER or ) but found " + (current != null ? current.getToken().name() : "EOF"));
+        } else {
+            return new Node("ArgList");
         }
     }
 
-    private void statements() throws ParserException {
-        while (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
-                getNextLexeme();
-                if (getCurrentLexeme().getToken() == Token.DEFINE) {
-                    definition();
-                } else {
-                    expr();
-                    match(Token.RIGHTPAR);
-                }
-            } else {
-                throw new ParserException("Syntax Error: unexpected token " + getCurrentLexeme().getToken().name());
-            }
+    private Node statements() throws ParserException {
+        Node statementsNode = new Node("Statements");
+
+        while (getCurrentLexeme() != null && getCurrentLexeme().getToken() != Token.RIGHTPAR) {
+            statementsNode.addChild(expression());
         }
+
+        return statementsNode;
     }
 
-    private void expression() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.IDENTIFIER || getCurrentLexeme().getToken().isLiteral()) {
+    private Node expression() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && (current.getToken().isLiteral() || current.getToken() == Token.IDENTIFIER)) {
+            Node literalNode = new Node("Literal", current.getValue());
             getNextLexeme();
-        } else if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
-            getNextLexeme();
-            expr();
+            return literalNode;
+        } else if (current != null && current.getToken() == Token.LEFTPAR) {
+            match(Token.LEFTPAR);
+            Node exprNode = expr();
             match(Token.RIGHTPAR);
+            return exprNode;
         } else {
-            throw new ParserException("Syntax Error: unexpected token " + getCurrentLexeme().getToken().name());
+            throw new ParserException("Syntax Error: unexpected token " + (current != null ? current.getToken().name() : "EOF"));
         }
     }
 
-    private void expr() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.LET) {
-            letExpression();
-        } else if (getCurrentLexeme().getToken() == Token.COND) {
-            condExpression();
-        } else if (getCurrentLexeme().getToken() == Token.IF) {
-            ifExpression();
-        } else if (getCurrentLexeme().getToken() == Token.BEGIN) {
-            beginExpression();
-        } else if (getCurrentLexeme().getToken() == Token.IDENTIFIER) {
-            funCall();
+    private Node expr() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.LET) {
+            return letExpression();
+        } else if (current != null && current.getToken() == Token.COND) {
+            return condExpression();
+        } else if (current != null && current.getToken() == Token.IF) {
+            return ifExpression();
+        } else if (current != null && current.getToken() == Token.BEGIN) {
+            return beginExpression();
+        } else if (current != null && current.getToken() == Token.IDENTIFIER) {
+            return funCall();
         } else {
-            throw new ParserException("Syntax Error: unexpected token " + getCurrentLexeme().getToken().name());
+            throw new ParserException("Syntax Error: unexpected token " + (current != null ? current.getToken().name() : "EOF"));
         }
     }
 
-    private void funCall() throws ParserException {
+    private Node funCall() throws ParserException {
         match(Token.IDENTIFIER);
-        expressions();
+        Node funCallNode = new Node("FunCall");
+        funCallNode.addChild(new Node("Identifier", getCurrentLexeme().getValue()));
+        expressions(funCallNode);
+        return funCallNode;
     }
 
-    private void expressions() throws ParserException {
-        while (getCurrentLexeme() != null && (getCurrentLexeme().getToken() == Token.LEFTPAR || getCurrentLexeme().getToken().isLiteral())) {
-            expression();
+    private void expressions(Node parentNode) throws ParserException {
+        if (getCurrentLexeme() != null && (getCurrentLexeme().getToken().isLiteral() || getCurrentLexeme().getToken() == Token.IDENTIFIER || getCurrentLexeme().getToken() == Token.LEFTPAR)) {
+            parentNode.addChild(expression());
+            expressions(parentNode);
         }
     }
 
-    private void letExpression() throws ParserException {
+    private Node letExpression() throws ParserException {
         match(Token.LET);
-        letExpr();
+        return letExpr();
     }
 
-    private void letExpr() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
+    private Node letExpr() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.LEFTPAR) {
             match(Token.LEFTPAR);
-            varDefs();
+            Node varDefsNode = varDefs();
             match(Token.RIGHTPAR);
-            statements();
-        } else if (getCurrentLexeme().getToken() == Token.IDENTIFIER) {
+            Node statementsNode = statements();
+            Node letExprNode = new Node("LetExpr");
+            letExprNode.addChild(varDefsNode);
+            letExprNode.addChild(statementsNode);
+            return letExprNode;
+        } else if (current != null && current.getToken() == Token.IDENTIFIER) {
             match(Token.IDENTIFIER);
             match(Token.LEFTPAR);
-            varDefs();
+            Node varDefsNode = varDefs();
             match(Token.RIGHTPAR);
-            statements();
+            Node statementsNode = statements();
+            Node letExprNode = new Node("LetExpr");
+            letExprNode.addChild(new Node("Identifier", current.getValue()));
+            letExprNode.addChild(varDefsNode);
+            letExprNode.addChild(statementsNode);
+            return letExprNode;
         } else {
-            throw new ParserException("Syntax Error: expected ( or IDENTIFIER but found " + getCurrentLexeme().getToken().name());
+            throw new ParserException("Syntax Error: expected ( or IDENTIFIER but found " + (current != null ? current.getToken().name() : "EOF"));
         }
     }
 
-    private void varDefs() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
+    private Node varDefs() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.LEFTPAR) {
             match(Token.LEFTPAR);
             match(Token.IDENTIFIER);
-            expression();
+            Node expressionNode = expression();
             match(Token.RIGHTPAR);
-            varDef();
-        } else if (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            throw new ParserException("Syntax Error: expected ( or ) but found " + getCurrentLexeme().getToken().name());
+            Node varDefsNode = varDef();
+            varDefsNode.addChild(expressionNode);
+            return varDefsNode;
+        } else if (current != null && current.getToken() != Token.RIGHTPAR) {
+            throw new ParserException("Syntax Error: expected ( or ) but found " + (current != null ? current.getToken().name() : "EOF"));
+        } else {
+            return new Node("VarDefs");
         }
     }
 
-    private void varDef() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
-            varDefs();
-        } else if (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            throw new ParserException("Syntax Error: expected ( or ) but found " + getCurrentLexeme().getToken().name());
+    private Node varDef() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.LEFTPAR) {
+            Node varDefsNode = varDefs();
+            return varDefsNode;
+        } else if (current != null && current.getToken() != Token.RIGHTPAR) {
+            throw new ParserException("Syntax Error: expected ( or ) but found " + (current != null ? current.getToken().name() : "EOF"));
+        } else {
+            return new Node("VarDef");
         }
     }
 
-    private void condExpression() throws ParserException {
+    private Node condExpression() throws ParserException {
         match(Token.COND);
-        condBranches();
+        return condBranches();
     }
 
-    private void condBranches() throws ParserException {
-        if (getCurrentLexeme().getToken() == Token.LEFTPAR) {
+    private Node condBranches() throws ParserException {
+        Lexeme current = getCurrentLexeme();
+        if (current != null && current.getToken() == Token.LEFTPAR) {
             match(Token.LEFTPAR);
-            expression();
-            statements();
+            Node expressionNode = expression();
+            Node statementsNode = statements();
             match(Token.RIGHTPAR);
-            condBranches();
-        } else if (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            throw new ParserException("Syntax Error: expected ( or ) but found " + getCurrentLexeme().getToken().name());
+            Node condBranchesNode = condBranches();
+            Node condBranchNode = new Node("CondBranch");
+            condBranchNode.addChild(expressionNode);
+            condBranchNode.addChild(statementsNode);
+            condBranchNode.addChild(condBranchesNode);
+            return condBranchNode;
+        } else if (current != null && current.getToken() != Token.RIGHTPAR) {
+            throw new ParserException("Syntax Error: expected ( or ) but found " + (current != null ? current.getToken().name() : "EOF"));
+        } else {
+            return new Node("CondBranches");
         }
     }
 
-    private void ifExpression() throws ParserException {
+    private Node ifExpression() throws ParserException {
         match(Token.IF);
-        expression();
-        expression();
-        endExpression();
-        match(Token.RIGHTPAR);
-    }
-
-    private void endExpression() throws ParserException {
-        if (getCurrentLexeme().getToken() != Token.RIGHTPAR) {
-            expression();
+        Node ifExpressionNode = new Node("IfExpression");
+        ifExpressionNode.addChild(expression());
+        ifExpressionNode.addChild(expression());
+        if (getCurrentLexeme() != null && getCurrentLexeme().getToken() != Token.RIGHTPAR) {
+            ifExpressionNode.addChild(expression());
         }
+        return ifExpressionNode;
     }
 
-    private void beginExpression() throws ParserException {
+    private Node beginExpression() throws ParserException {
         match(Token.BEGIN);
-        statements();
+        Node beginExpressionNode = new Node("BeginExpression");
+        beginExpressionNode.addChild(statements());
+        return beginExpressionNode;
     }
 
-    class ParserException extends Exception {
+    public static class ParserException extends Exception {
         public ParserException(String message) {
             super(message);
         }
